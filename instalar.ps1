@@ -48,7 +48,7 @@ foreach ($dir in $ShortcutDirs) {
     $lnkPath = Join-Path $dir "$appName.lnk"
     $lnk = $shell.CreateShortcut($lnkPath)
     $lnk.TargetPath = $edge
-    $lnk.Arguments = "--app=`"$fileUrl`" --window-size=520,760"
+    $lnk.Arguments = "--app=`"$fileUrl`" --window-size=520,960"
     $lnk.IconLocation = "$icoPath,0"
     $lnk.WorkingDirectory = $InstallDir
     $lnk.Description = 'Calculadora de Avg Bitrate para o HandBrake'
