@@ -1,0 +1,30 @@
+{
+  "name": "calculadora-de-bitrate",
+  "version": "1.0.0",
+  "description": "Calculadora de Avg Bitrate (kbps) para o HandBrake atingir um tamanho de arquivo desejado.",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guvon1982/calculadora-de-bitrate.git"
+  },
+  "scripts": {
+    "lint": "eslint . && html-validate index.html",
+    "test": "node --test",
+    "check": "npm run lint && npm test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-html": "^8.2.1",
+    "globals": "^17.14.0",
+    "html-validate": "^10.9.0",
+    "jsdom": "^29.1.1"
+  },
+  "overrides": {
+    "glob": "^14.0.4",
+    "minimatch": "^11.0.5"
+  }
+}
