@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- CSP: só permite o próprio CSS/JS embutido; nada é carregado da internet -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<title>Calculadora de Bitrate</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #181b22;
+    --field: #0f1115;
+    --border: #2a2f3a;
+    --text: #e6e8ee;
+    --muted: #8a92a6;
+    --accent: #4f8cff;
+    --accent-hover: #6a9dff;
+    --ok: #3ecf8e;
+    --warn-bg: #3a2a12;
+    --warn: #ffb547;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  .card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  h1 { font-size: 1.15rem; margin: 0 0 4px; font-weight: 600; }
+  .subtitle { color: var(--muted); font-size: .85rem; margin: 0 0 20px; }
+  fieldset, .group { border: 0; margin: 0 0 18px; padding: 0; }
+  legend, label.title { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+  .row { display: grid; gap: 10px; }
+  .row.three { grid-template-columns: repeat(3, 1fr); }
+  .row.size { grid-template-columns: 1fr 96px; }
+  .field { position: relative; }
+  .field .unit {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: .85rem; pointer-events: none;
+  }
+  input, select {
+    width: 100%;
+    background: var(--field);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 12px 34px 12px 12px;
+    font-size: 1rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+  }
+  select { padding-right: 12px; cursor: pointer; }
+  input:focus, select:focus { border-color: var(--accent); }
+  /* esconde as setinhas do campo numérico para um visual mais limpo */
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+
+  .hint { color: var(--muted); font-size: .78rem; margin: 8px 2px 0; line-height: 1.4; }
+  .hint strong { color: var(--text); font-weight: 600; }
+
+  .result {
+    margin-top: 6px;
+    background: var(--field);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+  }
+  .result .label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  .result .value { font-size: 3rem; font-weight: 700; line-height: 1.1; margin: 8px 0 2px; color: var(--ok); font-variant-numeric: tabular-nums; }
+  .result .value.empty { color: var(--muted); }
+  .result .detail { color: var(--muted); font-size: .8rem; white-space: pre-line; line-height: 1.5; }
+
+  .warning {
+    display: none;
+    margin-top: 12px;
+    background: var(--warn-bg);
+    color: var(--warn);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: .9rem;
+  }
+  .warning.show { display: block; }
+
+  .estimate { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .estimate-value { font-size: 1.3rem; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .estimate-value small { display: block; color: var(--muted); font-size: .78rem; font-weight: 400; margin-top: 2px; }
+
+  button {
+    width: 100%;
+    margin-top: 14px;
+    background: var(--accent);
+    color: #fff;
+    border: 0;
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  button:hover:not(:disabled) { background: var(--accent-hover); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>Calculadora de Bitrate</h1>
+  <p class="subtitle">Descubra o valor de <strong>Avg Bitrate (kbps)</strong> para o HandBrake.</p>
+
+  <fieldset>
+    <legend>Duração do vídeo</legend>
+    <div class="row three">
+      <div class="field"><input id="hours" type="number" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="Horas"><span class="unit">H</span></div>
+      <div class="field"><input id="minutes" type="number" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="Minutos"><span class="unit">M</span></div>
+      <div class="field"><input id="seconds" type="number" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="Segundos"><span class="unit">S</span></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Tamanho de destino desejado</legend>
+    <div class="row size">
+      <input id="size" type="number" min="0" step="any" inputmode="decimal" placeholder="Ex.: 700" aria-label="Tamanho de destino">
+      <select id="sizeUnit" aria-label="Unidade do tamanho">
+        <option value="MB" selected>MB</option>
+        <option value="GB">GB</option>
+      </select>
+    </div>
+  </fieldset>
+
+  <div class="group">
+    <label class="title" for="audio">Bitrate do áudio</label>
+    <div class="field"><input id="audio" type="number" min="0" step="1" inputmode="numeric" value="160" aria-describedby="audioHint"><span class="unit">kbps</span></div>
+    <p id="audioHint" class="hint">Use o mesmo valor da aba <strong>Audio</strong> do HandBrake (os presets usam 160). Várias faixas? Some os valores.</p>
+  </div>
+
+  <section class="result" aria-live="polite">
+    <div class="label">Avg Bitrate (kbps)</div>
+    <div id="result" class="value empty">—</div>
+    <div id="detail" class="detail">Preencha a duração e o tamanho.</div>
+    <div class="estimate">
+      <div class="label">Tamanho estimado do vídeo</div>
+      <div id="estimate" class="estimate-value">—</div>
+    </div>
+  </section>
+
+  <div id="warning" class="warning" role="alert">
+    O tamanho desejado é pequeno demais para essa duração: não sobra bitrate para o vídeo depois de descontar o áudio. Aumente o tamanho ou reduza o bitrate do áudio.
+  </div>
+
+  <button id="copy" type="button" disabled>Copiar resultado</button>
+</main>
+
+<script>
+  'use strict';
+
+  // "MB" como o Windows mostra no Explorador: 1 MB = 1024 × 1024 bytes
+  const BYTES_PER_MB = 1024 * 1024;
+  const MB_PER_GB = 1024;
+  // No HandBrake, 1 kbps = 1000 bits por segundo (não 1024)
+  const BITS_PER_KBPS = 1000;
+  // Reserva para o "envelope" do MP4/MKV (índices e cabeçalhos).
+  // Medido num encode real: ~1,5%. Reservamos 2% por segurança.
+  const CONTAINER_RESERVE = 0.02;
+  // Envelope real medido no encode de teste (1,53%): usado só na ESTIMATIVA,
+  // para mostrar o tamanho mais provável (a conta do bitrate usa a folga de 2%).
+  const CONTAINER_OVERHEAD = 0.0153;
+
+  const $ = (id) => document.getElementById(id);
+  const inputs = ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio'].map($);
+  const resultEl = $('result');
+  const detailEl = $('detail');
+  const warningEl = $('warning');
+  const estimateEl = $('estimate');
+  const copyBtn = $('copy');
+
+  // Bytes que o HandBrake deve gravar para um bitrate total (kbps) e uma duração (s)
+  function estimateFileBytes(totalKbps, totalSeconds) {
+    return (totalKbps * BITS_PER_KBPS / 8) * totalSeconds * (1 + CONTAINER_OVERHEAD);
+  }
+
+  const formatNumber = (value, digits) =>
+    value.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+  // Mostra em MB (como nas Propriedades) e em KB (como na coluna Tamanho do Explorador)
+  function formatSize(bytes) {
+    const mb = bytes / BYTES_PER_MB;
+    const kb = Math.ceil(bytes / 1024);
+    const main = mb >= 1024 ? `≈ ${formatNumber(mb / 1024, 2)} GB` : `≈ ${formatNumber(mb, 1)} MB`;
+    return { main, explorer: `${formatNumber(kb, 0)} KB na coluna Tamanho do Explorador` };
+  }
+
+  // Lê um campo numérico; vazio ou inválido vira 0 (nunca negativo)
+  function readNumber(id) {
+    const value = parseFloat($(id).value);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+
+  // Cálculo puro, separado da tela para ficar fácil de testar
+  function calculateVideoBitrate({ hours, minutes, seconds, size, unit, audioKbps }) {
+    const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+    if (totalSeconds <= 0 || size <= 0) return null;
+
+    const sizeMb = unit === 'GB' ? size * MB_PER_GB : size;
+    const usableBits = sizeMb * BYTES_PER_MB * 8 * (1 - CONTAINER_RESERVE);
+    const totalKbps = usableBits / BITS_PER_KBPS / totalSeconds;
+    const videoKbps = totalKbps - audioKbps;
+    return { totalSeconds, totalKbps, videoKbps };
+  }
+
+  let lastValue = null;
+
+  function update() {
+    const calc = calculateVideoBitrate({
+      hours: readNumber('hours'),
+      minutes: readNumber('minutes'),
+      seconds: readNumber('seconds'),
+      size: readNumber('size'),
+      unit: $('sizeUnit').value,
+      audioKbps: readNumber('audio'),
+    });
+
+    lastValue = null;
+    warningEl.classList.remove('show');
+    estimateEl.textContent = '—';
+    resultEl.classList.add('empty');
+
+    if (!calc) {
+      resultEl.textContent = '—';
+      detailEl.textContent = 'Preencha a duração e o tamanho.';
+    } else if (Math.floor(calc.videoKbps) <= 0) {
+      // menos de 1 kbps para o vídeo também é inútil: trata como "não cabe"
+      resultEl.textContent = '—';
+      detailEl.textContent = `Bitrate total disponível: ${Math.floor(calc.totalKbps)} kbps`;
+      warningEl.classList.add('show');
+    } else {
+      // Arredonda para baixo: garante que o arquivo não passe do tamanho desejado
+      lastValue = Math.floor(calc.videoKbps);
+      resultEl.textContent = lastValue;
+      resultEl.classList.remove('empty');
+      detailEl.textContent = `Total ${Math.floor(calc.totalKbps)} kbps − áudio ${readNumber('audio')} kbps\n(com 2% de folga para o container MP4/MKV)`;
+
+      // Estimativa com o número que você vai digitar no HandBrake
+      const outputKbps = lastValue + readNumber('audio');
+      const size = formatSize(estimateFileBytes(outputKbps, calc.totalSeconds));
+      estimateEl.textContent = size.main;
+      const small = document.createElement('small');
+      small.textContent = size.explorer;
+      estimateEl.appendChild(small);
+    }
+    copyBtn.disabled = lastValue === null;
+  }
+
+  async function copyResult() {
+    if (lastValue === null) return;
+    const text = String(lastValue);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Plano B para navegadores que bloqueiam a API de área de transferência
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      temp.remove();
+    }
+    copyBtn.textContent = 'Copiado!';
+    setTimeout(() => { copyBtn.textContent = 'Copiar resultado'; }, 1500);
+  }
+
+  inputs.forEach((el) => el.addEventListener('input', update));
+  copyBtn.addEventListener('click', copyResult);
+  update();
+</script>
+</body>
+</html>
