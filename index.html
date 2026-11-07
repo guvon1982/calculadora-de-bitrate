@@ -149,12 +149,6 @@
     <p id="audioHint" class="hint">Use o mesmo valor da aba <strong>Audio</strong> do HandBrake (os presets usam 160). Várias faixas? Some os valores.</p>
   </div>
 
-  <div class="group">
-    <label class="title" for="original">Bitrate total do vídeo original (opcional)</label>
-    <div class="field"><input id="original" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex.: 740" aria-describedby="originalHint"><span class="unit">kbps</span></div>
-    <p id="originalHint" class="hint">No Explorador do Windows, coluna <strong>Taxa de bits total</strong> (em inglês, <strong>Total bitrate</strong>). Não entra na conta: só avisa se você pedir mais qualidade do que o original tem.</p>
-  </div>
-
   <section class="result" aria-live="polite">
     <div class="label">Avg Bitrate (kbps)</div>
     <div id="result" class="value empty">—</div>
@@ -164,8 +158,6 @@
       <div id="estimate" class="estimate-value">—</div>
     </div>
   </section>
-
-  <div id="notice" class="warning" role="status"></div>
 
   <div id="warning" class="warning" role="alert">
     O tamanho desejado é pequeno demais para essa duração: não sobra bitrate para o vídeo depois de descontar o áudio. Aumente o tamanho ou reduza o bitrate do áudio.
@@ -190,12 +182,11 @@
   const CONTAINER_OVERHEAD = 0.0153;
 
   const $ = (id) => document.getElementById(id);
-  const inputs = ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio', 'original'].map($);
+  const inputs = ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio'].map($);
   const resultEl = $('result');
   const detailEl = $('detail');
   const warningEl = $('warning');
   const estimateEl = $('estimate');
-  const noticeEl = $('notice');
   const copyBtn = $('copy');
 
   // Bytes que o HandBrake deve gravar para um bitrate total (kbps) e uma duração (s)
@@ -246,8 +237,6 @@
 
     lastValue = null;
     warningEl.classList.remove('show');
-    noticeEl.classList.remove('show');
-    noticeEl.textContent = '';
     estimateEl.textContent = '—';
     resultEl.classList.add('empty');
 
@@ -273,15 +262,6 @@
       const small = document.createElement('small');
       small.textContent = size.explorer;
       estimateEl.appendChild(small);
-
-      // Aviso se o resultado pedir mais bitrate do que o original tem
-      const originalKbps = readNumber('original');
-      if (originalKbps > 0 && outputKbps > originalKbps) {
-        const usefulSize = formatSize(estimateFileBytes(originalKbps, calc.totalSeconds)).main;
-        noticeEl.textContent = `O original tem ${formatNumber(originalKbps, 0)} kbps no total e o resultado pede ${formatNumber(outputKbps, 0)} kbps. ` +
-          `Bitrate acima do original não melhora a qualidade, só aumenta o arquivo. Um tamanho de até ${usefulSize} já basta.`;
-        noticeEl.classList.add('show');
-      }
     }
     copyBtn.disabled = lastValue === null;
   }

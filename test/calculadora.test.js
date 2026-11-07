@@ -176,7 +176,6 @@ test('vários tamanhos e durações ficam entre 98% e 100% do alvo', () => {
 });
 
 const estimate = () => doc.getElementById('estimate').textContent;
-const noticeVisible = () => doc.getElementById('notice').classList.contains('show');
 
 test('estimativa de tamanho: caso real 200 MB / 1h19m23s → ≈ 198,9 MB', () => {
   fill({ h: '1', m: '19', s: '23', size: '200', audio: '160' });
@@ -202,23 +201,9 @@ test('sem resultado, estimativa fica vazia', () => {
   assert.equal(estimate(), '—');
 });
 
-test('campo do bitrate original existe e é opcional', () => {
-  const original = doc.getElementById('original');
-  assert.equal(original.getAttribute('type'), 'number');
-  assert.equal(original.required, false);
-  assert.equal(doc.querySelector('label[for="original"]').textContent.includes('opcional'), true);
-});
-
-test('avisa quando o resultado pede mais bitrate que o original', () => {
-  fill({ h: '1', m: '30', size: '700' });
-  assert.equal(noticeVisible(), false); // original vazio → sem aviso
-  type('original', '740');
-  // 937 + 128 = 1065 kbps > 740 → aviso, mas o resultado continua valendo
-  assert.equal(noticeVisible(), true);
-  assert.match(doc.getElementById('notice').textContent, /740 kbps.*1\.065 kbps/);
-  assert.equal(result(), '937');
-  type('original', '2000');
-  assert.equal(noticeVisible(), false);
+test('tela tem só os campos de duração, tamanho e áudio', () => {
+  const ids = [...doc.querySelectorAll('input, select')].map((el) => el.id);
+  assert.deepEqual(ids, ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio']);
 });
 
 test('botão Copiar copia o número e confirma na tela', async () => {

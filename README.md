@@ -56,7 +56,7 @@ E ela responde: **digite `905` no HandBrake.** ✅
 | Item | Você já tem? |
 |---|---|
 | 💻 Um computador com **Windows 10** ou **Windows 11** | Provavelmente sim |
-| 🌐 O navegador **Microsoft Edge** | Já vem instalado em todo Windows 10 e 11 |
+| 🌐 Um navegador de internet: **Google Chrome**, **Microsoft Edge**, **Firefox** ou **Opera** | **Sim.** Pode continuar usando o seu preferido. A calculadora abre na janela do **Edge**, que já vem instalado em todo Windows 10 e 11 |
 | 🌍 Internet | **Só para baixar.** Depois, a calculadora funciona totalmente sem internet |
 | 🔑 Senha de administrador | **Não precisa** |
 
@@ -76,17 +76,6 @@ flowchart LR
     D --> E["5️⃣ Fixar na barra"]
 ```
 
-### 🖱️ Antes de começar: três coisas sobre o mouse e o teclado
-
-Se você já sabe usar mouse, pode pular esta parte.
-
-| Quando o texto disser… | Faça assim |
-|---|---|
-| **"clique"** | Aperte **uma vez** o botão **esquerdo** do mouse (o botão maior, onde fica o dedo indicador). |
-| **"dois cliques"** | Aperte o botão **esquerdo** **duas vezes bem rápido**, sem mexer o mouse. |
-| **"clique com o botão direito"** | Aperte **uma vez** o botão **direito** do mouse. Vai aparecer uma listinha de opções (um "menu"). |
-| **"tecla Windows"** | É a tecla com o desenho de uma **janelinha** ⊞, na fileira de baixo do teclado, entre `Ctrl` e `Alt`. |
-
 ---
 
 <a id="passo-1"></a>
@@ -98,7 +87,7 @@ Se você já sabe usar mouse, pode pular esta parte.
    - No Edge e no Chrome, aparece um aviso no **canto de cima, à direita** da tela quando termina.
 3. Pronto. O arquivo foi para a pasta **Downloads** do seu computador.
 
-> 🧭 **Como achar a pasta Downloads:** aperte a **tecla Windows** e, sem soltar, aperte a letra **E**. Abre uma janela chamada **Explorador de Arquivos**. Na coluna da esquerda, clique em **Downloads**.
+> 🧭 **Como achar a pasta Downloads:** aperte a **tecla Windows** (a que tem o desenho de uma janelinha ⊞) e, sem soltar, aperte a letra **E**. Abre uma janela chamada **Explorador de Arquivos**. Na coluna da esquerda, clique em **Downloads**.
 
 ---
 
@@ -221,10 +210,9 @@ Pronto! O ícone azul `kbps` agora fica na barra de tarefas. É só **um clique*
 1. **Duração do vídeo:** digite as **horas** (H), os **minutos** (M) e os **segundos** (S). Campo vazio conta como zero.
 2. **Tamanho de destino:** digite o tamanho que você quer e escolha **MB** ou **GB** na caixinha ao lado.
 3. **Bitrate do áudio:** precisa ser **o mesmo número da aba Audio do HandBrake**. Os presets do HandBrake usam **160**, por isso ele já vem preenchido assim. Se você mudou o áudio lá, mude aqui também. Esse é o detalhe que mais faz o tamanho final errar.
-4. **Bitrate total do vídeo original (opcional):** se quiser, copie o número da coluna **Taxa de bits total** do Explorador do Windows (em inglês, **Total bitrate**). Ele **não muda a conta**. Serve só para avisar se você pedir mais qualidade do que o vídeo original tem.
-5. O resultado aparece **na hora**, em **verde e grande**. Não precisa apertar nenhum botão para calcular.
-6. Logo abaixo aparece o **tamanho estimado do vídeo**: quanto o arquivo deve ficar depois do HandBrake. A linha pequena mostra o mesmo tamanho em **KB**, porque é assim que a coluna **Tamanho** do Explorador mostra (por exemplo, `203.660 KB` é o mesmo que `198,9 MB`).
-7. Clique em **"Copiar resultado"**. O botão muda para **"Copiado!"**.
+4. O resultado aparece **na hora**, em **verde e grande**. Não precisa apertar nenhum botão para calcular.
+5. Logo abaixo aparece o **tamanho estimado do vídeo**: quanto o arquivo deve ficar depois do HandBrake. A linha pequena mostra o mesmo tamanho em **KB**, porque é assim que a coluna **Tamanho** do Explorador mostra (por exemplo, `203.660 KB` é o mesmo que `198,9 MB`).
+6. Clique em **"Copiar resultado"**. O botão muda para **"Copiado!"**.
 
 <br clear="right">
 
@@ -244,6 +232,8 @@ flowchart LR
 4. **Dica de ouro:** marque também a caixinha **2-Pass Encoding** (em versões novas o nome é **Multi-Pass Encoding**). O HandBrake demora mais, mas acerta o tamanho com muito mais precisão.
 5. Na aba **Audio**, confira a coluna **Bitrate**: tem que ser o mesmo número que você usou na calculadora (160, por padrão). Se tiver mais de uma linha (mais de uma faixa de áudio), some todas.
 
+> **Dica:** se o áudio do vídeo original é **128 kbps**, colocar **160** no HandBrake não melhora o som. Coloque **128** na aba Audio do HandBrake **e** na calculadora. Assim sobra mais espaço para a imagem.
+
 ### 🚨 Quando aparece o aviso amarelo
 
 <img src="docs/img/aviso.png" alt="Calculadora mostrando o aviso de tamanho pequeno demais" width="280" align="right">
@@ -256,14 +246,6 @@ Se você pedir um tamanho **pequeno demais** para a duração do vídeo, não so
 - Corte o vídeo para ele ficar mais curto.
 
 <br clear="right">
-
-### 💡 Quando aparece o aviso "acima do original"
-
-Esse aviso só aparece se você preencheu o campo **Bitrate total do vídeo original**. Ele quer dizer que o tamanho pedido daria **mais bitrate do que o vídeo original tem**.
-
-Pense numa foto pequena e borrada: ampliar a foto não deixa ela mais nítida, só ocupa mais espaço. Com vídeo acontece a mesma coisa. O aviso diz qual tamanho **já basta** para manter a qualidade do original. O resultado continua valendo, se mesmo assim você quiser usá-lo.
-
-> **Dica:** se o áudio do vídeo original é **128 kbps**, colocar **160** no HandBrake não melhora o som. Coloque **128** na aba Audio do HandBrake **e** na calculadora. Isso sobra mais espaço para a imagem.
 
 ---
 
