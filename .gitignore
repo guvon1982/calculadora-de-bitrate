@@ -1,0 +1,18 @@
+# Dependências do Node (reinstaladas com "npm ci")
+node_modules/
+
+# Segredos e configurações locais
+.env
+.env.*
+!.env.example
+
+# Arquivos temporários
+*.tmp
+*.log
+
+# Sistema operacional / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
