@@ -174,12 +174,11 @@
   const MB_PER_GB = 1024;
   // No HandBrake, 1 kbps = 1000 bits por segundo (não 1024)
   const BITS_PER_KBPS = 1000;
-  // Reserva para o "envelope" do MP4/MKV (índices e cabeçalhos).
-  // Medido num encode real: ~1,5%. Reservamos 2% por segurança.
-  const CONTAINER_RESERVE = 0.02;
-  // Envelope real medido no encode de teste (1,53%): usado só na ESTIMATIVA,
-  // para mostrar o tamanho mais provável (a conta do bitrate usa a folga de 2%).
-  const CONTAINER_OVERHEAD = 0.0153;
+  // "Envelope" do MP4 (índices e cabeçalhos): medido em 3 encodes reais do HandBrake
+  // (24 fps, áudio AAC 48 kHz) ele deu 712 a 718 bytes POR SEGUNDO de vídeo, seja qual
+  // for o bitrate. Usamos 720. Não é uma porcentagem: 0,6% do arquivo em 740 kbps,
+  // mas 2,8% em 39 kbps. Vídeos com mais quadros por segundo podem ter um pouco mais.
+  const CONTAINER_BYTES_PER_SECOND = 720;
 
   const $ = (id) => document.getElementById(id);
   const inputs = ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio'].map($);
@@ -191,7 +190,7 @@
 
   // Bytes que o HandBrake deve gravar para um bitrate total (kbps) e uma duração (s)
   function estimateFileBytes(totalKbps, totalSeconds) {
-    return (totalKbps * BITS_PER_KBPS / 8) * totalSeconds * (1 + CONTAINER_OVERHEAD);
+    return (totalKbps * BITS_PER_KBPS / 8 + CONTAINER_BYTES_PER_SECOND) * totalSeconds;
   }
 
   const formatNumber = (value, digits) =>
@@ -217,8 +216,9 @@
     if (totalSeconds <= 0 || size <= 0) return null;
 
     const sizeMb = unit === 'GB' ? size * MB_PER_GB : size;
-    const usableBits = sizeMb * BYTES_PER_MB * 8 * (1 - CONTAINER_RESERVE);
-    const totalKbps = usableBits / BITS_PER_KBPS / totalSeconds;
+    // bytes por segundo que cabem no arquivo, já sem o envelope do container
+    const usableBytesPerSecond = sizeMb * BYTES_PER_MB / totalSeconds - CONTAINER_BYTES_PER_SECOND;
+    const totalKbps = usableBytesPerSecond * 8 / BITS_PER_KBPS;
     const videoKbps = totalKbps - audioKbps;
     return { totalSeconds, totalKbps, videoKbps };
   }
@@ -246,14 +246,14 @@
     } else if (Math.floor(calc.videoKbps) <= 0) {
       // menos de 1 kbps para o vídeo também é inútil: trata como "não cabe"
       resultEl.textContent = '—';
-      detailEl.textContent = `Bitrate total disponível: ${Math.floor(calc.totalKbps)} kbps`;
+      detailEl.textContent = `Bitrate total disponível: ${Math.max(0, Math.floor(calc.totalKbps))} kbps`;
       warningEl.classList.add('show');
     } else {
       // Arredonda para baixo: garante que o arquivo não passe do tamanho desejado
       lastValue = Math.floor(calc.videoKbps);
       resultEl.textContent = lastValue;
       resultEl.classList.remove('empty');
-      detailEl.textContent = `Total ${Math.floor(calc.totalKbps)} kbps − áudio ${readNumber('audio')} kbps\n(com 2% de folga para o container MP4/MKV)`;
+      detailEl.textContent = `Total ${Math.floor(calc.totalKbps)} kbps − áudio ${readNumber('audio')} kbps\n(já descontado o espaço do container MP4)`;
 
       // Estimativa com o número que você vai digitar no HandBrake
       const outputKbps = lastValue + readNumber('audio');

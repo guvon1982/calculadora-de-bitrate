@@ -9,7 +9,7 @@
 ![Funciona sem internet](https://img.shields.io/badge/funciona-sem%20internet-3ecf8e)
 ![Grátis](https://img.shields.io/badge/pre%C3%A7o-gr%C3%A1tis-4f8cff)
 
-<img src="docs/img/resultado.png" alt="Tela da Calculadora de Bitrate mostrando o resultado 905 kbps" width="360">
+<img src="docs/img/resultado.png" alt="Tela da Calculadora de Bitrate mostrando o resultado 921 kbps" width="360">
 
 **[⬇️ Baixar agora](https://github.com/guvon1982/calculadora-de-bitrate/archive/refs/heads/main.zip)** · [Como instalar](#instalacao) · [Como usar](#como-usar) · [Problemas comuns](#problemas)
 
@@ -31,7 +31,7 @@ Esta calculadora resolve isso. Você diz:
 | 📦 Que tamanho você quer que ele tenha | 700 MB |
 | 🔊 A qualidade do som *(já vem preenchido)* | 160 |
 
-E ela responde: **digite `905` no HandBrake.** ✅
+E ela responde: **digite `921` no HandBrake.** ✅
 
 > 💡 **Analogia:** pense no tamanho do arquivo como uma mochila e no vídeo como uma viagem. Quanto mais longa a viagem (duração), menos coisa cabe por dia (bitrate). A calculadora divide a mochila igualmente pelos dias da viagem.
 
@@ -205,7 +205,7 @@ Pronto! O ícone azul `kbps` agora fica na barra de tarefas. É só **um clique*
 
 ## 🎯 Como usar
 
-<img src="docs/img/resultado.png" alt="Calculadora preenchida com 1h30, 700 MB e áudio 160, resultado 905" width="320" align="right">
+<img src="docs/img/resultado.png" alt="Calculadora preenchida com 1h30, 700 MB e áudio 160, resultado 921" width="320" align="right">
 
 1. **Duração do vídeo:** digite as **horas** (H), os **minutos** (M) e os **segundos** (S). Campo vazio conta como zero.
 2. **Tamanho de destino:** digite o tamanho que você quer e escolha **MB** ou **GB** na caixinha ao lado.
@@ -258,10 +258,11 @@ Se você pedir um tamanho **pequeno demais** para a duração do vídeo, não so
 ```mermaid
 flowchart TD
     T["⏱️ Duração<br/>H × 3600 + M × 60 + S<br/>= total de segundos"]
-    S["📦 Tamanho<br/>MB × 1024 × 1024 × 8<br/>= bits"]
-    S --> F["🧾 Guarda 2% para o<br/>envelope do MP4/MKV"]
-    T --> B
-    F --> B["🔢 Bitrate total<br/>bits ÷ 1000 ÷ segundos"]
+    S["📦 Tamanho<br/>MB × 1024 × 1024<br/>= bytes"]
+    S --> P["➗ Bytes por segundo<br/>bytes ÷ segundos"]
+    T --> P
+    P --> F["🧾 Desconta 720 bytes por segundo<br/>do envelope do MP4"]
+    F --> B["🔢 Bitrate total<br/>bytes por segundo × 8 ÷ 1000"]
     B --> V["🎬 Bitrate do vídeo<br/>bitrate total − áudio"]
     V --> R["✅ Resultado<br/>arredondado para baixo"]
 ```
@@ -271,21 +272,24 @@ flowchart TD
 | Etapa | Conta | Resultado |
 |---|---|---|
 | Duração em segundos | 1 × 3600 + 30 × 60 + 0 | **5.400 s** |
-| Tamanho em bits | 700 × 1.048.576 × 8 | **5.872.025.600 bits** |
-| Guarda 2% para o envelope | 5.872.025.600 × 0,98 | **5.754.585.088 bits** |
-| Bitrate total | 5.754.585.088 ÷ 1000 ÷ 5.400 | **1.065,7 kbps** |
-| Bitrate do vídeo | 1.065,7 − 160 | **905,7 kbps** |
-| Arredonda para baixo | | **905** ✅ |
+| Tamanho em bytes | 700 × 1.048.576 | **734.003.200 bytes** |
+| Bytes por segundo | 734.003.200 ÷ 5.400 | **135.926,5 bytes/s** |
+| Desconta o envelope do MP4 | 135.926,5 − 720 | **135.206,5 bytes/s** |
+| Bitrate total | 135.206,5 × 8 ÷ 1000 | **1.081,7 kbps** |
+| Bitrate do vídeo | 1.081,7 − 160 | **921,7 kbps** |
+| Arredonda para baixo | | **921** ✅ |
 
 > **Por que 1024 × 1024?** É assim que o **Windows** conta o "MB" quando mostra o tamanho de um arquivo. Usamos a mesma régua que você vai usar para conferir.
 >
-> **Por que dividir por 1000?** No HandBrake, **1 kbps = 1000 bits por segundo** (e não 1024).
+> **Por que × 8 ÷ 1000?** Cada byte tem 8 bits, e no HandBrake **1 kbps = 1000 bits por segundo** (e não 1024).
 >
-> **Por que guardar 2%?** O arquivo de vídeo (MP4 ou MKV) é como um **envelope** que guarda a imagem e o som juntos, e o envelope também ocupa espaço. Medimos num vídeo real: **1,5%**. Guardamos 2% por segurança.
+> **Por que descontar 720 bytes por segundo?** O arquivo de vídeo (MP4) é como um **envelope** que guarda a imagem e o som juntos, e o envelope também ocupa espaço: ele leva um **índice** que diz onde está cada quadro e cada pedacinho de som. Quanto mais longo o vídeo, maior o índice. Por isso o desconto é **por segundo**, e não uma porcentagem do tamanho. Medimos em 3 vídeos reais: **712 a 718 bytes por segundo**, com qualquer bitrate.
 >
 > **Por que arredondar para baixo?** Para o vídeo **nunca passar** do tamanho que você pediu.
 
-> 🎯 **Conferido com um vídeo de verdade.** Num vídeo de 1h19m23s com o HandBrake 1.10, a conta prevê o tamanho final com **erro menor que 0,1%**, e os testes automáticos do projeto checam isso.
+> 🎯 **Conferido com vídeos de verdade.** A conta foi calibrada com 3 encodes reais do HandBrake 1.10 (de 30 minutos a 2h17, com bitrates de 39 a 740 kbps). O modelo reproduz o tamanho desses arquivos com **erro menor que 0,2%**, e os testes automáticos do projeto checam isso.
+>
+> ⚠️ **Vídeos com mais quadros por segundo** (30 ou 60 fps) têm um índice maior, então o arquivo pode ficar um pouco acima do previsto. A calibração foi feita com vídeos de 24 fps.
 
 ---
 
