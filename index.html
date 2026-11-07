@@ -149,6 +149,18 @@
     <p id="audioHint" class="hint">Use o mesmo valor da aba <strong>Audio</strong> do HandBrake (os presets usam 160). Várias faixas? Some os valores.</p>
   </div>
 
+  <div class="group">
+    <label class="title" for="fps">Quadros por segundo (fps) do vídeo final</label>
+    <select id="fps" aria-describedby="fpsHint">
+      <option value="24">24 fps</option>
+      <option value="25">25 fps</option>
+      <option value="30" selected>30 fps</option>
+      <option value="50">50 fps</option>
+      <option value="60">60 fps</option>
+    </select>
+    <p id="fpsHint" class="hint">É o fps que o HandBrake vai gerar (aba <strong>Video</strong>, campo Framerate). Com <strong>Peak Framerate</strong>, vale o fps do seu vídeo, até o número marcado lá. Na dúvida, deixe 30.</p>
+  </div>
+
   <section class="result" aria-live="polite">
     <div class="label">Avg Bitrate (kbps)</div>
     <div id="result" class="value empty">—</div>
@@ -174,14 +186,44 @@
   const MB_PER_GB = 1024;
   // No HandBrake, 1 kbps = 1000 bits por segundo (não 1024)
   const BITS_PER_KBPS = 1000;
-  // "Envelope" do MP4 (índices e cabeçalhos): medido em 3 encodes reais do HandBrake
+  // "Envelope" do MP4 (índices e cabeçalhos). Medido em 3 encodes reais do HandBrake
   // (24 fps, áudio AAC 48 kHz) ele deu 712 a 718 bytes POR SEGUNDO de vídeo, seja qual
-  // for o bitrate. Usamos 720. Não é uma porcentagem: 0,6% do arquivo em 740 kbps,
-  // mas 2,8% em 39 kbps. Vídeos com mais quadros por segundo podem ter um pouco mais.
-  const CONTAINER_BYTES_PER_SECOND = 720;
+  // for o bitrate. Não é uma porcentagem: 0,6% do arquivo em 740 kbps, 2,8% em 39 kbps.
+  //
+  // De onde vêm esses bytes (caixas do índice "moov", lidas nos arquivos reais):
+  //  - por quadro de VÍDEO: 12,85 B (sdtp 1 + ctts 7,85 + stsz 4);
+  //  - por quadro de ÁUDIO: 4 B (stsz). AAC-LC a 48 kHz = 46,875 quadros por segundo;
+  //  - por "chunk": 4 B em cada trilha (stco). O HandBrake alterna 1 pedaço de vídeo e
+  //    1 de áudio (VAVAVA...), então há min(fps, 46,875) pares de chunks por segundo;
+  //  - a cada mudança no tamanho dos grupos de áudio (ou de vídeo, se fps > 46,875)
+  //    nasce uma entrada de 12 B no stsc. Com 24 fps os grupos são quase sempre de 2
+  //    quadros de áudio (2,25 mudanças por segundo); com 30 fps alternam entre 1 e 2
+  //    (26,25 mudanças por segundo), por isso o envelope cresce tanto.
+  // A 24 fps a conta dá 714,85 B/s (medido: 712 a 718). Somamos 5 B/s de folga.
+  // Conferido com encodes reais: 24 fps (4 arquivos), 30 fps (2) e 60 fps (1); a estrutura do
+  // índice saiu como prevista e o envelope ficou a menos de 1% do calculado. 25 e 50 fps
+  // seguem a mesma lógica, mas ainda NÃO foram conferidos com encode real.
+  const VIDEO_FRAME_BYTES = 12.85;
+  const AUDIO_FRAME_BYTES = 4;
+  const AUDIO_FRAMES_PER_SECOND = 48000 / 1024;
+  const CHUNK_OFFSET_BYTES = 4;
+  const STSC_ENTRY_BYTES = 12;
+  const SAFETY_BYTES_PER_SECOND = 5;
+
+  function containerBytesPerSecond(fps) {
+    const pairs = Math.min(fps, AUDIO_FRAMES_PER_SECOND);
+    const framesPerChunk = Math.max(fps, AUDIO_FRAMES_PER_SECOND) / pairs;
+    const fraction = framesPerChunk - Math.floor(framesPerChunk);
+    const stscChanges = 2 * Math.min(fraction, 1 - fraction) * pairs;
+    return VIDEO_FRAME_BYTES * fps
+      + AUDIO_FRAME_BYTES * AUDIO_FRAMES_PER_SECOND
+      + 2 * CHUNK_OFFSET_BYTES * pairs
+      + STSC_ENTRY_BYTES * stscChanges
+      + SAFETY_BYTES_PER_SECOND;
+  }
 
   const $ = (id) => document.getElementById(id);
-  const inputs = ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio'].map($);
+  const inputs = ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio', 'fps'].map($);
   const resultEl = $('result');
   const detailEl = $('detail');
   const warningEl = $('warning');
@@ -189,8 +231,8 @@
   const copyBtn = $('copy');
 
   // Bytes que o HandBrake deve gravar para um bitrate total (kbps) e uma duração (s)
-  function estimateFileBytes(totalKbps, totalSeconds) {
-    return (totalKbps * BITS_PER_KBPS / 8 + CONTAINER_BYTES_PER_SECOND) * totalSeconds;
+  function estimateFileBytes(totalKbps, totalSeconds, fps) {
+    return (totalKbps * BITS_PER_KBPS / 8 + containerBytesPerSecond(fps)) * totalSeconds;
   }
 
   const formatNumber = (value, digits) =>
@@ -211,16 +253,16 @@
   }
 
   // Cálculo puro, separado da tela para ficar fácil de testar
-  function calculateVideoBitrate({ hours, minutes, seconds, size, unit, audioKbps }) {
+  function calculateVideoBitrate({ hours, minutes, seconds, size, unit, audioKbps, fps }) {
     const totalSeconds = hours * 3600 + minutes * 60 + seconds;
     if (totalSeconds <= 0 || size <= 0) return null;
 
     const sizeMb = unit === 'GB' ? size * MB_PER_GB : size;
     // bytes por segundo que cabem no arquivo, já sem o envelope do container
-    const usableBytesPerSecond = sizeMb * BYTES_PER_MB / totalSeconds - CONTAINER_BYTES_PER_SECOND;
+    const usableBytesPerSecond = sizeMb * BYTES_PER_MB / totalSeconds - containerBytesPerSecond(fps);
     const totalKbps = usableBytesPerSecond * 8 / BITS_PER_KBPS;
     const videoKbps = totalKbps - audioKbps;
-    return { totalSeconds, totalKbps, videoKbps };
+    return { totalSeconds, totalKbps, videoKbps, fps };
   }
 
   let lastValue = null;
@@ -233,6 +275,7 @@
       size: readNumber('size'),
       unit: $('sizeUnit').value,
       audioKbps: readNumber('audio'),
+      fps: readNumber('fps') || 30,
     });
 
     lastValue = null;
@@ -257,7 +300,7 @@
 
       // Estimativa com o número que você vai digitar no HandBrake
       const outputKbps = lastValue + readNumber('audio');
-      const size = formatSize(estimateFileBytes(outputKbps, calc.totalSeconds));
+      const size = formatSize(estimateFileBytes(outputKbps, calc.totalSeconds, calc.fps));
       estimateEl.textContent = size.main;
       const small = document.createElement('small');
       small.textContent = size.explorer;

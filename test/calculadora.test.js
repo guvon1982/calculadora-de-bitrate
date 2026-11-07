@@ -36,12 +36,15 @@ function type(id, value) {
   el.dispatchEvent(new dom.window.Event('input'));
 }
 
-function fill({ h = '', m = '', s = '', size = '', unit = 'MB', audio = '128' }) {
+// Os testes dos encodes reais (todos de 24 fps) usam fps '24' por padrão aqui;
+// o padrão da TELA é 30 e tem teste próprio.
+function fill({ h = '', m = '', s = '', size = '', unit = 'MB', audio = '128', fps = '24' }) {
   type('hours', h);
   type('minutes', m);
   type('seconds', s);
   type('sizeUnit', unit);
   type('audio', audio);
+  type('fps', fps);
   type('size', size);
 }
 
@@ -233,9 +236,57 @@ test('sem resultado, estimativa fica vazia', () => {
   assert.equal(estimate(), '—');
 });
 
-test('tela tem só os campos de duração, tamanho e áudio', () => {
+test('tela tem os campos de duração, tamanho, áudio e fps', () => {
   const ids = [...doc.querySelectorAll('input, select')].map((el) => el.id);
-  assert.deepEqual(ids, ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio']);
+  assert.deepEqual(ids, ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio', 'fps']);
+});
+
+// O envelope do MP4 depende do fps: cada quadro de vídeo vira um "chunk" no arquivo
+// e a tabela do índice (stsz, ctts, sdtp, stco, stsc) cresce com eles. A conta está em
+// containerBytesPerSecond(): 719,85 B/s a 24 fps (igual ao medido: 712 a 718 + 5 de folga),
+// 788,7 a 25, 1132,9 a 30, 1284,9 a 50 e 1653,4 a 60.
+test('o padrão da tela é 30 fps, e as opções são 24, 25, 30, 50 e 60', () => {
+  const fpsSelect = doc.getElementById('fps');
+  assert.equal(fpsSelect.value, '30');
+  assert.deepEqual([...fpsSelect.options].map((o) => o.value), ['24', '25', '30', '50', '60']);
+});
+
+test('700 MB em 1h30 com áudio 160: o fps maior desconta mais envelope', () => {
+  // bytes por segundo = 734.003.200 / 5400 = 135.926,52; (− envelope) × 8 / 1000 − 160, para baixo
+  const expected = { 24: '921', 25: '921', 30: '918', 50: '917', 60: '914' };
+  for (const [fps, kbps] of Object.entries(expected)) {
+    fill({ h: '1', m: '30', size: '700', audio: '160', fps });
+    assert.equal(result(), kbps, `${fps} fps`);
+  }
+});
+
+// Encodes REAIS de 30 e 60 fps (HandBrake 1.10.2, Constant Framerate, 2 minutos, AAC 48 kHz).
+// Os kbps vêm das linhas "mux: track" do log; o envelope é o arquivo menos as trilhas.
+//  - 30 fps (3.600 quadros): envelope 137.021 e 137.185 B (~1.142 B/s, contando ~890 B fixos
+//    do arquivo). Índice: 3.599 chunks e 3.149 entradas no stsc (previsto: 3.600 e 3.150).
+//  - 60 fps (7.200 quadros): envelope 200.177 B (previsto 198.692, +0,75%). Índice: 5.625
+//    chunks por trilha (previsto 5.625) e 3.151 entradas de stsc no VÍDEO (previsto 3.150).
+const REAL_ENCODES_HIGH_FPS = [
+  { fps: '30', seconds: 120, videoKbps: 702.40, fileBytes: 13078341 },
+  { fps: '30', seconds: 120, videoKbps: 705.52, fileBytes: 13121264 },
+  { fps: '60', seconds: 120, videoKbps: 714.76, fileBytes: 13321400 },
+];
+
+test('30 e 60 fps: para o tamanho de um arquivo real, a calculadora devolve o bitrate que o HandBrake usou', () => {
+  for (const e of REAL_ENCODES_HIGH_FPS) {
+    fill({ s: String(e.seconds), size: String(e.fileBytes / WINDOWS_MB), audio: '160', fps: e.fps });
+    const diff = Number(result()) - e.videoKbps;
+    // (com o desconto de 24 fps daria 706 a 30 fps e 722 a 60 fps: o teste pega a diferença)
+    assert.ok(Math.abs(diff) <= 1.5, `${e.fps} fps: HandBrake usou ${e.videoKbps} kbps, a tela deu ${result()}`);
+  }
+});
+
+test('com o fps padrão (30) a estimativa não passa de 200 MB', () => {
+  type('hours', '1'); type('minutes', '19'); type('seconds', '23'); type('size', '200'); type('audio', '160');
+  // (44.029,5 − 1.132,9) × 8 / 1000 = 343,17 kbps total − 160 = 183,17 → 183
+  assert.equal(result(), '183');
+  // (343 × 125 + 1.132,9) × 4763 s = 209.609.627 bytes = 199,90 MB
+  assert.match(estimate(), /≈ 199,9 MB/);
 });
 
 test('botão Copiar copia o número e confirma na tela', async () => {
