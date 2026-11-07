@@ -46,16 +46,26 @@ function fill({ h = '', m = '', s = '', size = '', unit = 'MB', audio = '128' })
 }
 
 // --- Modelo do que o HandBrake realmente grava, calibrado com um encode real ---
-// Log do HandBrake 1.10.2 (x264 multi-pass, MP4), vídeo de 1h19m23s:
-//   vídeo 215 kbps → 127.985.993 bytes | áudio AAC 160 kbps → 95.277.270 bytes
-//   arquivo final no disco: 226.671.642 bytes
-// Conclusões: 1 kbps do HandBrake = 1000 bits/s, e o MP4 acrescenta ~1,53% de envelope.
-const REAL_ENCODE = { seconds: 4763.13, videoKbps: 215, audioKbps: 160, fileBytes: 226671642 };
-const MP4_OVERHEAD = (226671642 - (127985993 + 95277270)) / (127985993 + 95277270);
+// Logs do HandBrake 1.10.2 (x264 multi-pass, MP4, 24 fps, áudio AAC 160 kbps, 48 kHz).
+// "vídeo" e "áudio" são os bytes de cada trilha no log; "arquivo" é o tamanho no disco.
+// Conclusões: 1 kbps do HandBrake = 1000 bits/s, e o "envelope" do MP4 (índices e
+// cabeçalhos) depende da DURAÇÃO (~715 bytes por segundo), não do bitrate nem de %.
+const REAL_ENCODES = [
+  // pedido 185 kbps (e um encode anterior a 215 kbps deu o MESMO envelope: 3.408.379 B)
+  { videoKbps: 185, seconds: 4763.13, videoBytes: 110122747, audioBytes: 95277270, fileBytes: 208808396 },
+  // pedido 39 kbps: bitrate baixíssimo, envelope = 2,8% do arquivo
+  { videoKbps: 39, seconds: 8259.54, videoBytes: 40232208, audioBytes: 165232298, fileBytes: 211346156 },
+  // pedido 740 kbps: bitrate alto, envelope = 0,6% do arquivo
+  { videoKbps: 740, seconds: 1825.46, videoBytes: 168826765, audioBytes: 36307414, fileBytes: 206444218 },
+];
+const AUDIO_KBPS = 160;
+const overheadOf = (e) => e.fileBytes - (e.videoBytes + e.audioBytes);
+const MP4_OVERHEAD_PER_SECOND =
+  REAL_ENCODES.reduce((sum, e) => sum + overheadOf(e) / e.seconds, 0) / REAL_ENCODES.length;
 
 function handbrakeFileBytes(videoKbps, audioKbps, seconds) {
   const streamBytes = ((videoKbps + audioKbps) * 1000 / 8) * seconds;
-  return streamBytes * (1 + MP4_OVERHEAD);
+  return streamBytes + MP4_OVERHEAD_PER_SECOND * seconds;
 }
 
 // "MB" como o Windows mostra no Explorador (1 MB = 1024 × 1024 bytes)
@@ -74,40 +84,40 @@ test('tela inicial: campos padrão e resultado vazio', () => {
   assert.equal(copyButton().disabled, true);
 });
 
-// Fórmula: MB × 1024 × 1024 bytes × 8 bits × 0,98 (reserva do container) ÷ 1000 ÷ segundos
-// = MB × 8220,8358 ÷ segundos  →  kbps total; menos o áudio; arredonda para baixo
-test('700 MB em 1h30 com áudio 128 → 937 kbps', () => {
-  // 700 × 8220,8358 / 5400 s = 1065,66 kbps total − 128 = 937,66 → 937
+// Fórmula: (MB × 1024 × 1024 bytes ÷ segundos − 720 bytes/s do container) × 8 ÷ 1000
+// = kbps total; menos o áudio; arredonda para baixo
+test('700 MB em 1h30 com áudio 128 → 953 kbps', () => {
+  // (734.003.200 / 5400 − 720) × 8 / 1000 = 1081,65 kbps total − 128 = 953,65 → 953
   fill({ h: '1', m: '30', s: '0', size: '700' });
-  assert.equal(result(), '937');
+  assert.equal(result(), '953');
   assert.equal(copyButton().disabled, false);
   assert.equal(warningVisible(), false);
 });
 
 test('converte GB para MB (1 GB = 1024 MB)', () => {
-  // 2048 × 8220,8358 / 5400 = 3117,83 − 128 = 2989,83 → 2989
+  // (2.147.483.648 / 5400 − 720) × 8 / 1000 = 3175,70 − 128 = 3047,70 → 3047
   fill({ h: '1', m: '30', size: '2', unit: 'GB' });
-  assert.equal(result(), '2989');
+  assert.equal(result(), '3047');
 });
 
 test('soma horas, minutos e segundos', () => {
-  // 1h 1m 1s = 3661 s; 500 × 8220,8358 / 3661 = 1122,76 − 128 = 994,76 → 994
+  // 1h 1m 1s = 3661 s; (524.288.000 / 3661 − 720) × 8 / 1000 = 1139,95 − 128 = 1011,95 → 1011
   fill({ h: '1', m: '1', s: '1', size: '500' });
-  assert.equal(result(), '994');
+  assert.equal(result(), '1011');
 });
 
 test('respeita bitrate de áudio alterado', () => {
-  // mesmo caso de 937, mas áudio 192 → 1065,66 − 192 = 873,66 → 873
+  // mesmo caso de 953, mas áudio 192 → 1081,65 − 192 = 889,65 → 889
   fill({ h: '1', m: '30', size: '700', audio: '192' });
-  assert.equal(result(), '873');
+  assert.equal(result(), '889');
 });
 
 test('atualiza em tempo real a cada digitação', () => {
   fill({ h: '1', m: '30', size: '700' });
-  assert.equal(result(), '937');
+  assert.equal(result(), '953');
   type('size', '1400');
-  // 1400 × 8220,8358 / 5400 = 2131,33 − 128 = 2003,33 → 2003
-  assert.equal(result(), '2003');
+  // (1.468.006.400 / 5400 − 720) × 8 / 1000 = 2169,06 − 128 = 2041,06 → 2041
+  assert.equal(result(), '2041');
 });
 
 test('tamanho pequeno demais mostra aviso e bloqueia cópia', () => {
@@ -118,8 +128,8 @@ test('tamanho pequeno demais mostra aviso e bloqueia cópia', () => {
 });
 
 test('sobra de menos de 1 kbps para o vídeo também é aviso', () => {
-  // 1 MB em 64 s = 8220,8358 / 64 = 128,45 kbps total − 128 = 0,45 → arredondaria para 0
-  fill({ m: '1', s: '4', size: '1' });
+  // 2 MB em 101 s: (2.097.152 / 101 − 720) × 8 / 1000 = 160,35 kbps total − 160 = 0,35 → arredondaria para 0
+  fill({ m: '1', s: '41', size: '2', audio: '160' });
   assert.equal(warningVisible(), true);
   assert.equal(result(), '—');
 });
@@ -134,32 +144,52 @@ test('campos vazios ou duração zero não calculam', () => {
 
 test('valores negativos são tratados como zero', () => {
   fill({ h: '1', m: '30', size: '700', audio: '-500' });
-  // áudio negativo vira 0 → 1065,66 → 1065
-  assert.equal(result(), '1065');
+  // áudio negativo vira 0 → 1081,65 → 1081
+  assert.equal(result(), '1081');
 });
 
-test('modelo do HandBrake reproduz o arquivo real com erro < 0,1%', () => {
-  const predicted = handbrakeFileBytes(REAL_ENCODE.videoKbps, REAL_ENCODE.audioKbps, REAL_ENCODE.seconds);
-  const error = Math.abs(predicted - REAL_ENCODE.fileBytes) / REAL_ENCODE.fileBytes;
-  assert.ok(error < 0.001, `erro do modelo: ${(error * 100).toFixed(3)}%`);
+test('o envelope do MP4 é constante por segundo, e NÃO uma porcentagem do arquivo', () => {
+  const perSecond = REAL_ENCODES.map((e) => overheadOf(e) / e.seconds);
+  for (const value of perSecond) {
+    assert.ok(Math.abs(value - MP4_OVERHEAD_PER_SECOND) / MP4_OVERHEAD_PER_SECOND < 0.01,
+      `envelope por segundo: ${perSecond.map((v) => v.toFixed(1))} B/s`);
+  }
+  // já em porcentagem do arquivo varia mais de 4 vezes (0,6% a 2,8%): por isso uma
+  // reserva fixa de 2% errava para mais em vídeos longos e para menos nos curtos
+  const percent = REAL_ENCODES.map((e) => overheadOf(e) / e.fileBytes);
+  assert.ok(Math.max(...percent) / Math.min(...percent) > 4);
 });
 
-// Regressão: o usuário pediu 200 MB para 1h19m23s, deixou o áudio no padrão
-// e o HandBrake (preset Fast 1080p30, áudio 160) gerou 216 MB.
-test('caso real: 200 MB em 1h19m23s com áudio padrão não passa de 200 MB', () => {
-  fill({ h: '1', m: '19', s: '23', size: '200', audio: doc.getElementById('audio').value });
-  const videoKbps = Number(result());
-  const fileMb = handbrakeFileBytes(videoKbps, 160, 4763) / WINDOWS_MB;
-  assert.ok(fileMb <= 200, `arquivo previsto: ${fileMb.toFixed(1)} MB`);
-  // e também não desperdiça: fica a menos de 2% abaixo do alvo
-  assert.ok(fileMb >= 196, `arquivo previsto: ${fileMb.toFixed(1)} MB`);
+test('modelo do HandBrake reproduz os arquivos reais com erro < 0,2%', () => {
+  for (const e of REAL_ENCODES) {
+    const predicted = handbrakeFileBytes(e.videoKbps, AUDIO_KBPS, e.seconds);
+    const error = Math.abs(predicted - e.fileBytes) / e.fileBytes;
+    // sobra ~0,1% porque o áudio real oscila até 0,6% abaixo do nominal (159,1 kbps no 3º)
+    assert.ok(error < 0.002, `${e.videoKbps} kbps: erro do modelo ${(error * 100).toFixed(3)}%`);
+  }
 });
+
+// Regressão dos encodes reais do usuário: todos pediram 200 MB com áudio 160.
+//  - 2h17m39s (8259 s) saiu com 201,5 MB (acima do alvo: envelope de 2,8%, e não 2%)
+//  - 0h30m25s (1825 s) saiu com 196,9 MB (1,5% abaixo: envelope de 0,6%)
+//  - 1h19m23s (4763 s) foi o caso que já acertava
+for (const c of [
+  { name: '1h19m23s', h: '1', m: '19', s: '23', seconds: 4763 },
+  { name: '2h17m39s', h: '2', m: '17', s: '39', seconds: 8259 },
+  { name: '0h30m25s', h: '0', m: '30', s: '25', seconds: 1825 },
+]) {
+  test(`caso real: 200 MB em ${c.name} com áudio padrão fica entre 99,5% e 100% do alvo`, () => {
+    fill({ h: c.h, m: c.m, s: c.s, size: '200', audio: doc.getElementById('audio').value });
+    const fileMb = handbrakeFileBytes(Number(result()), AUDIO_KBPS, c.seconds) / WINDOWS_MB;
+    assert.ok(fileMb <= 200 && fileMb >= 199, `arquivo previsto: ${fileMb.toFixed(2)} MB`);
+  });
+}
 
 test('áudio padrão é 160 kbps, igual aos presets do HandBrake', () => {
   assert.equal(doc.getElementById('audio').value, '160');
 });
 
-test('vários tamanhos e durações ficam entre 98% e 100% do alvo', () => {
+test('vários tamanhos e durações ficam entre 99,5% e 100% do alvo', () => {
   const cases = [
     { h: '0', m: '10', s: '0', size: '50', unit: 'MB', audio: '160' },
     { h: '1', m: '30', s: '0', size: '700', unit: 'MB', audio: '128' },
@@ -171,18 +201,19 @@ test('vários tamanhos e durações ficam entre 98% e 100% do alvo', () => {
     const seconds = Number(c.h) * 3600 + Number(c.m) * 60 + Number(c.s);
     const targetBytes = Number(c.size) * WINDOWS_MB * (c.unit === 'GB' ? 1024 : 1);
     const ratio = handbrakeFileBytes(Number(result()), Number(c.audio), seconds) / targetBytes;
-    assert.ok(ratio <= 1 && ratio >= 0.98, `${JSON.stringify(c)} → ${(ratio * 100).toFixed(2)}% do alvo`);
+    assert.ok(ratio <= 1 && ratio >= 0.995, `${JSON.stringify(c)} → ${(ratio * 100).toFixed(2)}% do alvo`);
   }
 });
 
 const estimate = () => doc.getElementById('estimate').textContent;
 
-test('estimativa de tamanho: caso real 200 MB / 1h19m23s → ≈ 198,9 MB', () => {
+test('estimativa de tamanho: caso real 200 MB / 1h19m23s → ≈ 199,7 MB', () => {
   fill({ h: '1', m: '19', s: '23', size: '200', audio: '160' });
-  assert.equal(result(), '185');
-  // (185 + 160) kbps × 1000 / 8 × 4763 s × 1,0153 = 208.547.062 bytes = 198,89 MB
-  assert.match(estimate(), /≈ 198,9 MB/);
-  assert.match(estimate(), /203\.660 KB na coluna Tamanho/);
+  // (209.715.200 / 4763 − 720) × 8 / 1000 = 346,5 kbps total − 160 = 186,5 → 186
+  assert.equal(result(), '186');
+  // (346 kbps × 125 + 720) bytes/s × 4763 s = 209.429.110 bytes = 199,73 MB = 204.521 KB
+  assert.match(estimate(), /≈ 199,7 MB/);
+  assert.match(estimate(), /204\.521 KB na coluna Tamanho/);
 });
 
 test('estimativa nunca passa do tamanho desejado', () => {
@@ -193,7 +224,8 @@ test('estimativa nunca passa do tamanho desejado', () => {
 
 test('estimativa em GB quando passa de 1024 MB', () => {
   fill({ h: '2', m: '0', size: '2', unit: 'GB', audio: '160' });
-  assert.match(estimate(), /≈ 1,9\d GB/);
+  // estimativa ≈ 2.047,7 MB = 1,9997 GB, que aparece arredondado: 2,00 GB
+  assert.match(estimate(), /≈ 2,00 GB/);
 });
 
 test('sem resultado, estimativa fica vazia', () => {
@@ -210,6 +242,6 @@ test('botão Copiar copia o número e confirma na tela', async () => {
   fill({ h: '1', m: '30', size: '700' });
   copyButton().click();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(copied, ['937']);
+  assert.deepEqual(copied, ['953']);
   assert.equal(copyButton().textContent, 'Copiado!');
 });
