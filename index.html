@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- CSP: só permite o próprio CSS/JS embutido; nada é carregado da internet -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<title>Calculadora de Bitrate</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #181b22;
+    --field: #0f1115;
+    --border: #2a2f3a;
+    --text: #e6e8ee;
+    --muted: #8a92a6;
+    --accent: #4f8cff;
+    --accent-hover: #6a9dff;
+    --ok: #3ecf8e;
+    --warn-bg: #3a2a12;
+    --warn: #ffb547;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  .card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  h1 { font-size: 1.15rem; margin: 0 0 4px; font-weight: 600; }
+  .subtitle { color: var(--muted); font-size: .85rem; margin: 0 0 20px; }
+  fieldset, .group { border: 0; margin: 0 0 18px; padding: 0; }
+  legend, label.title { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+  .row { display: grid; gap: 10px; }
+  .row.three { grid-template-columns: repeat(3, 1fr); }
+  .row.size { grid-template-columns: 1fr 96px; }
+  .field { position: relative; }
+  .field .unit {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: .85rem; pointer-events: none;
+  }
+  input, select {
+    width: 100%;
+    background: var(--field);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 12px 34px 12px 12px;
+    font-size: 1rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+  }
+  select { padding-right: 12px; cursor: pointer; }
+  input:focus, select:focus { border-color: var(--accent); }
+  /* esconde as setinhas do campo numérico para um visual mais limpo */
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+
+  .result {
+    margin-top: 6px;
+    background: var(--field);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+  }
+  .result .label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  .result .value { font-size: 3rem; font-weight: 700; line-height: 1.1; margin: 8px 0 2px; color: var(--ok); font-variant-numeric: tabular-nums; }
+  .result .value.empty { color: var(--muted); }
+  .result .detail { color: var(--muted); font-size: .8rem; }
+
+  .warning {
+    display: none;
+    margin-top: 12px;
+    background: var(--warn-bg);
+    color: var(--warn);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: .9rem;
+  }
+  .warning.show { display: block; }
+
+  button {
+    width: 100%;
+    margin-top: 14px;
+    background: var(--accent);
+    color: #fff;
+    border: 0;
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  button:hover:not(:disabled) { background: var(--accent-hover); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>Calculadora de Bitrate</h1>
+  <p class="subtitle">Descubra o valor de <strong>Avg Bitrate (kbps)</strong> para o HandBrake.</p>
+
+  <fieldset>
+    <legend>Duração do vídeo</legend>
+    <div class="row three">
+      <div class="field"><input id="hours" type="number" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="Horas"><span class="unit">H</span></div>
+      <div class="field"><input id="minutes" type="number" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="Minutos"><span class="unit">M</span></div>
+      <div class="field"><input id="seconds" type="number" min="0" step="1" inputmode="numeric" placeholder="0" aria-label="Segundos"><span class="unit">S</span></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Tamanho de destino desejado</legend>
+    <div class="row size">
+      <input id="size" type="number" min="0" step="any" inputmode="decimal" placeholder="Ex.: 700" aria-label="Tamanho de destino">
+      <select id="sizeUnit" aria-label="Unidade do tamanho">
+        <option value="MB" selected>MB</option>
+        <option value="GB">GB</option>
+      </select>
+    </div>
+  </fieldset>
+
+  <div class="group">
+    <label class="title" for="audio">Bitrate do áudio</label>
+    <div class="field"><input id="audio" type="number" min="0" step="1" inputmode="numeric" value="128"><span class="unit">kbps</span></div>
+  </div>
+
+  <section class="result" aria-live="polite">
+    <div class="label">Avg Bitrate (kbps)</div>
+    <div id="result" class="value empty">—</div>
+    <div id="detail" class="detail">Preencha a duração e o tamanho.</div>
+  </section>
+
+  <div id="warning" class="warning" role="alert">
+    O tamanho desejado é pequeno demais para essa duração: não sobra bitrate para o vídeo depois de descontar o áudio. Aumente o tamanho ou reduza o bitrate do áudio.
+  </div>
+
+  <button id="copy" type="button" disabled>Copiar resultado</button>
+</main>
+
+<script>
+  'use strict';
+
+  // 1 MB = 8192 kilobits (1024 KB × 8 bits), conforme especificado
+  const KILOBITS_PER_MB = 8192;
+  const MB_PER_GB = 1024;
+
+  const $ = (id) => document.getElementById(id);
+  const inputs = ['hours', 'minutes', 'seconds', 'size', 'sizeUnit', 'audio'].map($);
+  const resultEl = $('result');
+  const detailEl = $('detail');
+  const warningEl = $('warning');
+  const copyBtn = $('copy');
+
+  // Lê um campo numérico; vazio ou inválido vira 0 (nunca negativo)
+  function readNumber(id) {
+    const value = parseFloat($(id).value);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+
+  // Cálculo puro, separado da tela para ficar fácil de testar
+  function calculateVideoBitrate({ hours, minutes, seconds, size, unit, audioKbps }) {
+    const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+    if (totalSeconds <= 0 || size <= 0) return null;
+
+    const sizeMb = unit === 'GB' ? size * MB_PER_GB : size;
+    const sizeKilobits = sizeMb * KILOBITS_PER_MB;
+    const totalKbps = sizeKilobits / totalSeconds;
+    const videoKbps = totalKbps - audioKbps;
+    return { totalSeconds, totalKbps, videoKbps };
+  }
+
+  let lastValue = null;
+
+  function update() {
+    const calc = calculateVideoBitrate({
+      hours: readNumber('hours'),
+      minutes: readNumber('minutes'),
+      seconds: readNumber('seconds'),
+      size: readNumber('size'),
+      unit: $('sizeUnit').value,
+      audioKbps: readNumber('audio'),
+    });
+
+    lastValue = null;
+    warningEl.classList.remove('show');
+    resultEl.classList.add('empty');
+
+    if (!calc) {
+      resultEl.textContent = '—';
+      detailEl.textContent = 'Preencha a duração e o tamanho.';
+    } else if (calc.videoKbps <= 0) {
+      resultEl.textContent = '—';
+      detailEl.textContent = `Bitrate total disponível: ${Math.floor(calc.totalKbps)} kbps`;
+      warningEl.classList.add('show');
+    } else {
+      // Arredonda para baixo: garante que o arquivo não passe do tamanho desejado
+      lastValue = Math.floor(calc.videoKbps);
+      resultEl.textContent = lastValue;
+      resultEl.classList.remove('empty');
+      detailEl.textContent = `Total ${Math.floor(calc.totalKbps)} kbps − áudio ${readNumber('audio')} kbps`;
+    }
+    copyBtn.disabled = lastValue === null;
+  }
+
+  async function copyResult() {
+    if (lastValue === null) return;
+    const text = String(lastValue);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Plano B para navegadores que bloqueiam a API de área de transferência
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      temp.remove();
+    }
+    copyBtn.textContent = 'Copiado!';
+    setTimeout(() => { copyBtn.textContent = 'Copiar resultado'; }, 1500);
+  }
+
+  inputs.forEach((el) => el.addEventListener('input', update));
+  copyBtn.addEventListener('click', copyResult);
+  update();
+</script>
+</body>
+</html>
